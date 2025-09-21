@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Açılan Kalp & Not</title>
+<style>
+  :root{
+    --bg: #ffffff;
+    --emoji-size: 36px;
+    --gap: 48px;
+    --center-heart-size: 180px;
+    --transition-duration: 900ms; /* "yavaş" açılma */
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* emoji grid background */
+  .emoji-grid{
+    position:fixed;
+    inset:0;
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--emoji-size), 1fr));
+    gap: calc(var(--gap) - var(--emoji-size));
+    align-items:center;
+    justify-items:center;
+    pointer-events:none; /* arka plan tıklanmasın */
+    z-index:1;
+    padding:40px;
+    box-sizing:border-box;
+  }
+  .emoji-grid > .e{
+    font-size:var(--emoji-size);
+    line-height:1;
+    transform: translateY(0);
+    opacity:0.95;
+    user-select:none;
+  }
+
+  /* merkezdeki alan */
+  .center{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:5;
+    pointer-events:auto;
+  }
+
+  /* kalp kapsayıcı */
+  .heart-button{
+    position:relative;
+    width: var(--center-heart-size);
+    height: var(--center-heart-size);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    background:transparent;
+    border:0;
+    padding:0;
+    outline:none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* iki yarım emoji ile "açılma" efekti */
+  .heart{
+    position:relative;
+    width:100%;
+    height:100%;
+    display:block;
+    overflow:visible;
+  }
+  .heart .half{
+    position:absolute;
+    top:0;
+    bottom:0;
+    width:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: calc(var(--center-heart-size) * 0.9);
+    transition: transform var(--transition-duration) cubic-bezier(0.22, 1, 0.36, 1), opacity 300ms;
+    will-change: transform, opacity;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  .heart .half.left{
+    left:0;
+    transform-origin: right center;
+    clip-path: polygon(0 0, 100% 0, 70% 50%, 100% 100%, 0 100%);
+  }
+  .heart .half.right{
+    right:0;
+    transform-origin: left center;
+    clip-path: polygon(100% 0, 100% 100%, 0 100%, 30% 50%, 0 0);
+  }
+
+  /* açılma sınıfı */
+  .heart.open .half.left{
+    transform: translateX(-60%) rotate(-10deg) scale(0.95);
+    opacity:0.95;
+  }
+  .heart.open .half.right{
+    transform: translateX(60%) rotate(10deg) scale(0.95);
+    opacity:0.95;
+  }
+
+  /* not kutusu */
+  .note{
+    position:absolute;
+    bottom: calc(-1 * (var(--center-heart-size) * 0.6));
+    left:50%;
+    transform: translate(-50%, 20px);
+    min-width: 240px;
+    max-width: 420px;
+    padding:18px 20px;
+    background: linear-gradient(180deg,#fff 0%, #fffefc 100%);
+    border-radius:12px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+    text-align:center;
+    font-size:16px;
+    line-height:1.3;
+    opacity:0;
+    pointer-events:none;
+    transition: transform 600ms cubic-bezier(.2,.9,.3,1), opacity 600ms;
+    z-index:6;
+    border: 2px solid rgba(255, 0, 50, 0.08);
+  }
+
+  /* notun "çıkma" hali */
+  .heart.open + .note{
+    opacity:1;
+    transform: translate(-50%, -18px); /* yukarı doğru çıkış */
+    pointer-events:auto;
+  }
+
+  /* not üzerindeki metin vurgusu (kırmızı bir satır veya emoji) */
+  .note .text{
+    color:#b20000;
+    font-weight:700;
+    letter-spacing:0.2px;
+  }
+
+  /* küçük ipuçları */
+  .hint{
+    font-size:12px;
+    color:#666;
+    position:fixed;
+    bottom:18px;
+    left:18px;
+    z-index:7;
+  }
+
+  /* responsive: kalp büyüklüğünü küçült */
+  @media (max-width:480px){
+    :root{ --center-heart-size: 120px; --emoji-size:28px; --gap:36px;}
+    .note{ font-size:14px; min-width:180px; max-width:320px; padding:14px 12px;}
+  }
+</style>
+</head>
+<body>
+
+  <!-- arka plan emoji ızgarası -->
+  <div class="emoji-grid" id="bgGrid" aria-hidden="true"></div>
+
+  <!-- merkez alan: kalp ve not -->
+  <div class="center">
+    <button class="heart-button" id="heartBtn" aria-label="Büyük kalp - tıkla">
+      <div class="heart" id="heart">
+        <!-- iki yarım aynı emoji ile klipleyerek 'açılma' efekti -->
+        <div class="half left">❤️</div>
+        <div class="half right">❤️</div>
+      </div>
+    </button>
+
+    <div class="note" id="note" role="status" aria-live="polite">
+      <div class="text">Bakma bana öyle kırgın kırgın sende bana hastasın nenesi çılgın</div>
+    </div>
+  </div>
+
+  <div class="hint">Kalbe tıkla</div>
+
+<script>
+  // Arka plan için emoji ızgarasını dolduralım.
+  (function createBackground(){
+    const grid = document.getElementById('bgGrid');
+    const emoji = '😍'; // gözleri kırmızı kalp olan emoji isteğe göre değişir
+    // Hesapla: yatay * dikey kadar eleman ekle
+    // Kolaylık: ekran boyutuna göre yaklaşık 8-12 satır/ sütun
+    const cols = Math.max(6, Math.floor(window.innerWidth / 120));
+    const rows = Math.max(6, Math.floor(window.innerHeight / 120));
+    const total = cols * rows;
+
+    // Temizle
+    grid.innerHTML = '';
+    for(let i=0;i<total;i++){
+      const el = document.createElement('div');
+      el.className = 'e';
+      el.textContent = emoji;
+      // hafif varyasyon için küçük animasyon gecikmesi
+      el.style.transition = 'transform 900ms ease';
+      // rastgele hafif yukarı-aşağı hareket ekleyelim (fading subtle)
+      const offset = Math.random() * 8 - 4;
+      el.style.transform = `translateY(${offset}px)`;
+      grid.appendChild(el);
+    }
+  })();
+
+  // Kalp ve not animasyonu
+  const heart = document.getElementById('heart');
+  const heartBtn = document.getElementById('heartBtn');
+  const note = document.getElementById('note');
+
+  let opened = false;
+  heartBtn.addEventListener('click', () => {
+    opened = !opened;
+    if(opened){
+      heart.classList.add('open');
+      // küçük gecikme ile notu göster (not .heart.open + .note ilişkisiyle de çalışır)
+      // notu odakla erişilebilirlik için
+      setTimeout(()=> {
+        note.focus?.();
+      }, 700);
+    } else {
+      heart.classList.remove('open');
+    }
+  });
+
+  // pencere yeniden boyutlandığında ızgarayı yeniden hesapla
+  window.addEventListener('resize', () => {
+    // Basit debounce
+    clearTimeout(window._bgResizeT);
+    window._bgResizeT = setTimeout(() => {
+      (function rebuild(){
+        const grid = document.getElementById('bgGrid');
+        const cols = Math.max(6, Math.floor(window.innerWidth / 120));
+        const rows = Math.max(6, Math.floor(window.innerHeight / 120));
+        const total = cols * rows;
+        grid.innerHTML = '';
+        for(let i=0;i<total;i++){
+          const el = document.createElement('div');
+          el.className = 'e';
+          el.textContent = '😍';
+          const offset = Math.random() * 8 - 4;
+          el.style.transform = `translateY(${offset}px)`;
+          grid.appendChild(el);
+        }
+      })();
+    }, 120);
+  });
+</script>
+</body>
+</html>
